@@ -11,13 +11,14 @@ import javax.imageio.ImageIO;
 public class GamePanel extends JPanel implements Runnable, KeyListener {
     // Game constants
     private static final int FPS = 30;
+    private static final int STAR_COUNT = 200;
 
     // Game state
     private Thread gameThread;
     private boolean isRunning = true;
     private int score = 0;
     private int lives = 3;
-    private boolean shieldActive = false;
+    private boolean shieldActive = true;
     private long shieldEndTime = 0;
 
     // Entities
@@ -25,6 +26,7 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
     private List<Invader> invaders;
     private List<Bullet> bullets;
     private List<PowerUp> powerUps;
+    private List<Star> stars;
 
     // Resources
     private BufferedImage playerImage;
@@ -45,7 +47,6 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
             // Load and resize player image to 40x30
             playerImage = ImageIO.read(getClass().getResourceAsStream("/Resources/Images/PlayerShip.png"));
             playerImage = resizeImage(playerImage, 40, 30);
-
             // Load and resize invader images to match player ship size (40x30)
             BufferedImage originalInvaderImage = ImageIO
                     .read(getClass().getResourceAsStream("/Resources/Images/Invader.png"));
@@ -57,8 +58,11 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
             explosionSound = GameUtils.loadSound("/sounds/explosion.wav");
             shieldSound = GameUtils.loadSound("/sounds/shield.wav");
             gameOverSound = GameUtils.loadSound("/sounds/game_over.wav");
-            bgMusic = GameUtils.loadSound("/sounds/bg_music.wav");
+            bgMusic = GameUtils.loadSound("/Resources/Sounds/LoopableBackgroundMusic.wav");
             if (bgMusic != null) {
+                bgMusic.setFramePosition(0);
+                FloatControl gainControl = (FloatControl) bgMusic.getControl(FloatControl.Type.MASTER_GAIN);
+                gainControl.setValue(-10.0f); // Reduce volume by 10 decibels
                 bgMusic.loop(Clip.LOOP_CONTINUOUSLY);
             }
         } catch (IOException e) {
@@ -89,6 +93,10 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
         invaders = new ArrayList<>();
         bullets = new ArrayList<>();
         powerUps = new ArrayList<>();
+        stars = new ArrayList<>();
+        for (int i = 0; i < STAR_COUNT; i++) {
+            stars.add(new Star(getWidth()));
+        }
 
         // Adjust spacing for invaders that are now 40x30
         for (int row = 0; row < 4; row++) {
@@ -171,10 +179,11 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
         if (shieldActive && System.currentTimeMillis() > shieldEndTime) {
             shieldActive = false;
         }
-
+        updateStars();
         updateInvaders();
         updateBullets();
         updatePowerUps();
+        updateStars();
         checkCollisions();
         checkGameOver();
     }
@@ -185,6 +194,15 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
             if (Math.random() < 0.001) {
                 Rectangle bounds = invader.getBounds();
                 bullets.add(new InvaderBullet(bounds.x + bounds.width / 2, bounds.y + bounds.height));
+            }
+        }
+    }
+
+    private void updateStars() {
+        for (Star star : stars) {
+            star.update();
+            if (star.isOffscreen()) {
+                star.reset(getWidth());
             }
         }
     }
@@ -227,18 +245,25 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-        // Initialize back buffer
         if (backBuffer == null || backBuffer.getWidth() != getWidth() || backBuffer.getHeight() != getHeight()) {
             backBuffer = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
         }
 
         Graphics2D g2d = backBuffer.createGraphics();
 
-        // Clear screen with new background color
-        g2d.setColor(new Color(0x0B, 0x00, 0x4E)); // #0B004E
+        // Draw background gradient
+        GradientPaint gradient = new GradientPaint(
+                0, 0, new Color(0x0B, 0x00, 0x4E),
+                0, getHeight(), new Color(0x16, 0x00, 0x85));
+        g2d.setPaint(gradient);
         g2d.fillRect(0, 0, getWidth(), getHeight());
 
-        // Draw game elements
+        // Draw stars
+        for (Star star : stars) {
+            star.draw(g2d);
+        }
+
+        // Draw existing game elements
         drawPlayer(g2d);
         drawInvaders(g2d);
         drawBullets(g2d);
@@ -249,7 +274,6 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
             pu.draw(g2d);
         }
 
-        // Draw back buffer to screen
         g.drawImage(backBuffer, 0, 0, null);
         g2d.dispose();
     }
@@ -295,6 +319,12 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
 
     private void gameOver(boolean won) {
         isRunning = false;
+        
+        // Stop background music
+        if (bgMusic != null) {
+            bgMusic.stop();
+        }
+        
         if (won) {
             JOptionPane.showMessageDialog(this,
                     "Congratulations! You Won!\nFinal Score: " + score,
