@@ -32,6 +32,9 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
     private BufferedImage playerImage;
     private BufferedImage[] invaderImages = new BufferedImage[2];
     private Clip shootSound, explosionSound, shieldSound, bgMusic, gameOverSound;
+    private Clip invaderDieSound;
+    private Clip playerDieSound;
+    private Clip victorySound;
 
     public GamePanel() {
         setPreferredSize(new Dimension(800, 600));
@@ -54,11 +57,14 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
             invaderImages[1] = resizeImage(originalInvaderImage, 40, 30);
 
             // Load sounds
-            shootSound = GameUtils.loadSound("/sounds/shoot.wav");
+            shootSound = GameUtils.loadSound("/Resources/Sounds/PlayerShip_ShotSound.wav");
             explosionSound = GameUtils.loadSound("/sounds/explosion.wav");
             shieldSound = GameUtils.loadSound("/sounds/shield.wav");
             gameOverSound = GameUtils.loadSound("/sounds/game_over.wav");
             bgMusic = GameUtils.loadSound("/Resources/Sounds/LoopableBackgroundMusic.wav");
+            invaderDieSound = GameUtils.loadSound("/Resources/Sounds/Invader_Die_Sound_Effect.wav");
+            playerDieSound = GameUtils.loadSound("/Resources/Sounds/PlayerShip_Die_Sound_Effect.wav");
+            victorySound = GameUtils.loadSound("/Resources/Sounds/Victory_Theme.wav");
             if (bgMusic != null) {
                 bgMusic.setFramePosition(0);
                 FloatControl gainControl = (FloatControl) bgMusic.getControl(FloatControl.Type.MASTER_GAIN);
@@ -90,6 +96,7 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
 
     private void initGame() {
         player = new PlayerShip(playerImage, 400, 500, 5);
+        player.updateDamageEffect(lives); // Set initial state
         invaders = new ArrayList<>();
         bullets = new ArrayList<>();
         powerUps = new ArrayList<>();
@@ -209,34 +216,33 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
 
     private void checkCollisions() {
         List<Bullet> bulletsToRemove = new ArrayList<>();
-        List<Invader> invadersToRemove = new ArrayList<>();
 
         for (Bullet bullet : bullets) {
             Rectangle bulletBounds = bullet.getBounds();
 
             if (bullet instanceof PlayerBullet) {
-                // Player bullets can only hit invaders
                 for (Invader invader : invaders) {
-                    if (bulletBounds.intersects(invader.getBounds())) {
+                    if (!invader.isExploding() && bulletBounds.intersects(invader.getBounds())) {
                         bulletsToRemove.add(bullet);
-                        invadersToRemove.add(invader);
+                        invader.startExplosion();
+                        playSound(invaderDieSound);
                         score += 100;
-                        playSound(explosionSound);
                         break;
                     }
                 }
             } else if (bullet instanceof InvaderBullet) {
-                // Invader bullets can only hit the player
                 if (!shieldActive && bulletBounds.intersects(player.getBounds())) {
                     bulletsToRemove.add(bullet);
                     lives--;
-                    playSound(explosionSound);
+                    player.updateDamageEffect(lives); // Update damage effect
+                    playSound(playerDieSound);
                 }
             }
         }
 
+        // Remove completed explosions
+        invaders.removeIf(Invader::isExplosionComplete);
         bullets.removeAll(bulletsToRemove);
-        invaders.removeAll(invadersToRemove);
     }
 
     private BufferedImage backBuffer;
@@ -319,13 +325,14 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
 
     private void gameOver(boolean won) {
         isRunning = false;
-        
+
         // Stop background music
         if (bgMusic != null) {
             bgMusic.stop();
         }
-        
+
         if (won) {
+            playSound(victorySound); // Play victory theme
             JOptionPane.showMessageDialog(this,
                     "Congratulations! You Won!\nFinal Score: " + score,
                     "Victory!",
@@ -354,7 +361,7 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
         if (player.canShoot()) {
             Rectangle bounds = player.getBounds();
             bullets.add(new PlayerBullet(bounds.x + bounds.width / 2, bounds.y));
-            playSound(shootSound);
+            playSound(shootSound); // This line already exists and will play the sound
             player.updateLastShotTime();
         }
     }
