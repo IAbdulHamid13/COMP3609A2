@@ -6,7 +6,7 @@ public class PlayerShip {
     private BufferedImage image;
     private int x, y, speed;
     private long lastShotTime = 0;
-    private static final long SHOT_COOLDOWN = 500; // 0.5 seconds in milliseconds
+    private static final long SHOT_COOLDOWN = 1000; // 1 second in milliseconds
     private int maxLives = 3;
     private int currentLives = 3;
 

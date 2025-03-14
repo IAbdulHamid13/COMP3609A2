@@ -18,20 +18,17 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
     private boolean isRunning = true;
     private int score = 0;
     private int lives = 3;
-    private boolean shieldActive = true;
-    private long shieldEndTime = 0;
 
     // Entities
     private PlayerShip player;
     private List<Invader> invaders;
     private List<Bullet> bullets;
-    private List<PowerUp> powerUps;
     private List<Star> stars;
 
     // Resources
     private BufferedImage playerImage;
     private BufferedImage[] invaderImages = new BufferedImage[2];
-    private Clip shootSound, explosionSound, shieldSound, bgMusic, gameOverSound;
+    private Clip shootSound, explosionSound, bgMusic, gameOverSound;
     private Clip invaderDieSound;
     private Clip playerDieSound;
     private Clip victorySound;
@@ -59,7 +56,6 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
             // Load sounds
             shootSound = GameUtils.loadSound("/Resources/Sounds/PlayerShip_ShotSound.wav");
             explosionSound = GameUtils.loadSound("/sounds/explosion.wav");
-            shieldSound = GameUtils.loadSound("/sounds/shield.wav");
             gameOverSound = GameUtils.loadSound("/sounds/game_over.wav");
             bgMusic = GameUtils.loadSound("/Resources/Sounds/LoopableBackgroundMusic.wav");
             invaderDieSound = GameUtils.loadSound("/Resources/Sounds/Invader_Die_Sound_Effect.wav");
@@ -78,8 +74,9 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
             playerImage = createPlaceholderImage(40, 30, Color.GREEN);
             invaderImages[0] = createPlaceholderImage(40, 30, Color.RED);
             invaderImages[1] = createPlaceholderImage(40, 30, Color.ORANGE);
+            System.out.println("Placeholder images loaded. Sorry the game looks bad. :(");
         } catch (Exception e) {
-            System.out.println("Sound loading failed: " + e.getMessage());
+            System.out.println("Sound loading failed, now you can't hear the amazing music :(");
         }
     }
 
@@ -99,7 +96,6 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
         player.updateDamageEffect(lives); // Set initial state
         invaders = new ArrayList<>();
         bullets = new ArrayList<>();
-        powerUps = new ArrayList<>();
         stars = new ArrayList<>();
         for (int i = 0; i < STAR_COUNT; i++) {
             stars.add(new Star(getWidth()));
@@ -150,22 +146,11 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
         bullets.removeAll(toRemove);
     }
 
-    private void updatePowerUps() {
-        List<PowerUp> toRemove = new ArrayList<>();
-        for (PowerUp pu : powerUps) {
-            if (pu.getBounds().intersects(player.getBounds())) {
-                activateShield();
-                toRemove.add(pu);
-            }
-        }
-        powerUps.removeAll(toRemove);
-    }
-
     private void checkGameOver() {
         // Check for loss conditions
         for (Invader invader : invaders) {
             Rectangle bounds = invader.getBounds();
-            if (bounds.y > 500) { // If invaders reach bottom
+            if (bounds.y > 500) { // If invaders reach bottom (untested)
                 gameOver(false);
                 return;
             }
@@ -182,14 +167,8 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
     }
 
     private void update() {
-        // Check if shield has expired
-        if (shieldActive && System.currentTimeMillis() > shieldEndTime) {
-            shieldActive = false;
-        }
-        updateStars();
         updateInvaders();
         updateBullets();
-        updatePowerUps();
         updateStars();
         checkCollisions();
         checkGameOver();
@@ -231,7 +210,7 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
                     }
                 }
             } else if (bullet instanceof InvaderBullet) {
-                if (!shieldActive && bulletBounds.intersects(player.getBounds())) {
+                if (bulletBounds.intersects(player.getBounds())) {
                     bulletsToRemove.add(bullet);
                     lives--;
                     player.updateDamageEffect(lives); // Update damage effect
@@ -274,24 +253,12 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
         drawInvaders(g2d);
         drawBullets(g2d);
         drawHUD(g2d);
-
-        // Draw power-ups
-        for (PowerUp pu : powerUps) {
-            pu.draw(g2d);
-        }
-
         g.drawImage(backBuffer, 0, 0, null);
         g2d.dispose();
     }
 
     private void drawPlayer(Graphics2D g2d) {
         player.draw(g2d);
-        if (shieldActive) {
-            Rectangle bounds = player.getBounds();
-            g2d.setColor(new Color(0, 0, 255, 100));
-            g2d.fillOval(bounds.x - 10, bounds.y - 10,
-                    bounds.width + 20, bounds.height + 20);
-        }
     }
 
     private void drawInvaders(Graphics2D g2d) {
@@ -310,17 +277,6 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
         g2d.setColor(Color.WHITE);
         g2d.drawString("Score: " + score, 20, 20);
         g2d.drawString("Lives: " + lives, 20, 40);
-
-        if (shieldActive) {
-            g2d.setColor(Color.BLUE);
-            g2d.drawString("Shield Active!", 20, 60);
-        }
-    }
-
-    private void activateShield() {
-        shieldActive = true;
-        shieldEndTime = System.currentTimeMillis() + 5000;
-        playSound(shieldSound);
     }
 
     private void gameOver(boolean won) {
@@ -332,7 +288,7 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
         }
 
         if (won) {
-            playSound(victorySound); // Play victory theme
+            playSound(victorySound);
             JOptionPane.showMessageDialog(this,
                     "Congratulations! You Won!\nFinal Score: " + score,
                     "Victory!",
@@ -361,7 +317,7 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
         if (player.canShoot()) {
             Rectangle bounds = player.getBounds();
             bullets.add(new PlayerBullet(bounds.x + bounds.width / 2, bounds.y));
-            playSound(shootSound); // This line already exists and will play the sound
+            playSound(shootSound);
             player.updateLastShotTime();
         }
     }
