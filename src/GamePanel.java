@@ -47,7 +47,6 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
             // Load and resize player image to 40x30
             playerImage = ImageIO.read(getClass().getResourceAsStream("/Resources/Images/PlayerShip.png"));
             playerImage = resizeImage(playerImage, 40, 30);
-            // Load and resize invader images to match player ship size (40x30)
             BufferedImage originalInvaderImage = ImageIO
                     .read(getClass().getResourceAsStream("/Resources/Images/Invader.png"));
             invaderImages[0] = resizeImage(originalInvaderImage, 40, 30);
@@ -68,27 +67,17 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
                 bgMusic.loop(Clip.LOOP_CONTINUOUSLY);
             }
         } catch (IOException e) {
-            System.out.println("Error loading images: " + e.getMessage());
-            e.printStackTrace(); // Add this to see detailed error message
-            // Fallback to placeholder images if loading fails
-            playerImage = createPlaceholderImage(40, 30, Color.GREEN);
-            invaderImages[0] = createPlaceholderImage(40, 30, Color.RED);
-            invaderImages[1] = createPlaceholderImage(40, 30, Color.ORANGE);
-            System.out.println("Placeholder images loaded. Sorry the game looks bad. :(");
+            System.err.println("Resource loading failed");
+            createFallbackResources();
         } catch (Exception e) {
             System.out.println("Sound loading failed, now you can't hear the amazing music :(");
         }
     }
 
-    private BufferedImage createPlaceholderImage(int width, int height, Color color) {
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = image.createGraphics();
-        g2d.setColor(color);
-        g2d.fillRect(0, 0, width, height);
-        g2d.setColor(Color.WHITE);
-        g2d.drawRect(0, 0, width - 1, height - 1);
-        g2d.dispose();
-        return image;
+    private void createFallbackResources() {
+        playerImage = new BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB);
+        invaderImages[0] = playerImage;
+        invaderImages[1] = playerImage;
     }
 
     private void initGame() {
@@ -101,7 +90,6 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
             stars.add(new Star(getWidth()));
         }
 
-        // Adjust spacing for invaders that are now 40x30
         for (int row = 0; row < 4; row++) {
             for (int col = 0; col < 8; col++) {
                 invaders.add(new Invader(invaderImages, 100 + col * 60, 100 + row * 50));
@@ -213,13 +201,12 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
                 if (bulletBounds.intersects(player.getBounds())) {
                     bulletsToRemove.add(bullet);
                     lives--;
-                    player.updateDamageEffect(lives); // Update damage effect
+                    player.updateDamageEffect(lives);
                     playSound(playerDieSound);
                 }
             }
         }
 
-        // Remove completed explosions
         invaders.removeIf(Invader::isExplosionComplete);
         bullets.removeAll(bulletsToRemove);
     }
@@ -236,19 +223,16 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
 
         Graphics2D g2d = backBuffer.createGraphics();
 
-        // Draw background gradient
         GradientPaint gradient = new GradientPaint(
                 0, 0, new Color(0x0B, 0x00, 0x4E),
                 0, getHeight(), new Color(0x16, 0x00, 0x85));
         g2d.setPaint(gradient);
         g2d.fillRect(0, 0, getWidth(), getHeight());
 
-        // Draw stars
         for (Star star : stars) {
             star.draw(g2d);
         }
 
-        // Draw existing game elements
         drawPlayer(g2d);
         drawInvaders(g2d);
         drawBullets(g2d);
@@ -282,7 +266,6 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
     private void gameOver(boolean won) {
         isRunning = false;
 
-        // Stop background music
         if (bgMusic != null) {
             bgMusic.stop();
         }
@@ -340,11 +323,9 @@ public class GamePanel extends JPanel implements Runnable, KeyListener {
 
     @Override
     public void keyTyped(KeyEvent e) {
-        // Not needed
     }
 
     @Override
     public void keyReleased(KeyEvent e) {
-        // Not needed
     }
 }
